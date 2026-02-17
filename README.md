@@ -44,6 +44,15 @@ node --experimental-strip-types src/index.ts
 
 **안정적으로 한 통계를 쓰려면:** 단일 인스턴스에서만 서버를 돌리거나, DB/Redis 등 공용 저장소에 저장하도록 바꾸면 됩니다.
 
+## CORS
+
+토스 미니앱(테스트/실제)에서 API 호출이 되도록 다음 Origin을 허용합니다.
+
+- `https://*.private-apps.tossmini.com` (QR 테스트)
+- `https://*.apps.tossmini.com` (실제 서비스)
+
+`credentials: true`로 설정되어 있어, 위 도메인에서 `fetch(..., { credentials: 'include' })`로 호출하면 쿠키가 전달됩니다.
+
 ## 참고
 
 - 통계는 메모리에만 저장되며, 서버 재시작 시 초기화됩니다.

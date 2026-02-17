@@ -1,6 +1,27 @@
 import express from 'express'
+import cors from 'cors'
 
 const app = express()
+
+const ALLOWED_ORIGIN_SUFFIXES = ['.private-apps.tossmini.com', '.apps.tossmini.com']
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin || !origin.startsWith('https://')) return false
+  return ALLOWED_ORIGIN_SUFFIXES.some((s) => origin.endsWith(s))
+}
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (isAllowedOrigin(origin)) {
+        cb(null, origin!)
+      } else {
+        cb(null, false)
+      }
+    },
+    credentials: true,
+  })
+)
+
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000
 const COOKIE_VISIT = 'hw_visit'
 
@@ -55,7 +76,7 @@ app.get('/api/stats/total', (req, res) => {
     allTimeTotal += 1
     res.setHeader(
       'Set-Cookie',
-      `${COOKIE_VISIT}=${now}; Path=/; Max-Age=${86400 * 2}; SameSite=Lax`
+      `${COOKIE_VISIT}=${now}; Path=/; Max-Age=${86400 * 2}; SameSite=None; Secure`
     )
   } else if (todayCount === 0) {
     // 재시작/다른 인스턴스로 메모리가 0인데, 쿠키로 오늘 방문자는 있음 → 최소 1명으로 표시
