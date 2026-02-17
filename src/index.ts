@@ -58,22 +58,41 @@ let todayStartKST = getTodayStartKST()
 let todayCount = 0
 let allTimeTotal = 0
 
+/** 같은 IP가 N분 안에 여러 번 호출해도 1명으로만 셈 (쿠키 없는 요청·중복 호출 완화) */
+const IP_COOLDOWN_MS = 10 * 60 * 1000 // 10분
+const lastCountByIp = new Map<string, number>()
+
+function getClientIp(req: express.Request): string {
+  const forwarded = req.headers['x-forwarded-for']
+  const first = typeof forwarded === 'string' ? forwarded.split(',')[0]?.trim() : forwarded?.[0]
+  return first || req.socket?.remoteAddress || req.ip || ''
+}
+
 app.get('/api/stats/total', (req, res) => {
   const nowStart = getTodayStartKST()
   if (nowStart > todayStartKST) {
     todayStartKST = nowStart
     todayCount = 0
+    lastCountByIp.clear()
   }
 
+  const now = Date.now()
   const todayStr = getTodayDateStringKST()
   const visitCookieRaw = getCookie(req, COOKIE_VISIT)?.trim()
   const visitTs = visitCookieRaw ? Number(visitCookieRaw) : NaN
   const alreadyCountedToday = !Number.isNaN(visitTs) && isVisitTimeWithinTodayKST(visitTs)
 
-  const now = Date.now()
-  if (!alreadyCountedToday) {
+  const ip = getClientIp(req)
+  const lastCountAt = lastCountByIp.get(ip)
+  const withinIpCooldown = lastCountAt != null && now - lastCountAt < IP_COOLDOWN_MS
+
+  if (!alreadyCountedToday && !withinIpCooldown) {
     todayCount += 1
     allTimeTotal += 1
+    if (ip) lastCountByIp.set(ip, now)
+    for (const [k, t] of lastCountByIp.entries()) {
+      if (now - t > IP_COOLDOWN_MS) lastCountByIp.delete(k)
+    }
     res.setHeader(
       'Set-Cookie',
       `${COOKIE_VISIT}=${now}; Path=/; Max-Age=${86400 * 2}; SameSite=None; Secure`
