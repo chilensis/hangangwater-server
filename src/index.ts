@@ -21,6 +21,7 @@ function getHourKST(ts: number): number {
   return d.getUTCHours()
 }
 
+const instanceId = Math.random().toString(36).slice(2, 8)
 let todayStartKST = getTodayStartKST()
 const hourlyCounts = new Array<number>(24).fill(0)
 let allTimeTotal = 0
@@ -52,6 +53,7 @@ app.get('/api/stats/hourly', (req, res) => {
   }
   const items = hourlyCounts.map((count, hour) => ({ hour, count }))
   res.json({
+    instanceId,
     date: new Date(todayStartKST + KST_OFFSET_MS).toISOString().slice(0, 10),
     timezone: 'Asia/Seoul',
     hourly: items,
@@ -66,6 +68,7 @@ app.get('/api/stats/total', (req, res) => {
   }
   const todayTotal = hourlyCounts.reduce((a, b) => a + b, 0)
   res.json({
+    instanceId,
     today: todayTotal,
     allTime: allTimeTotal,
     date: new Date(todayStartKST + KST_OFFSET_MS).toISOString().slice(0, 10),
