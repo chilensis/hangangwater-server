@@ -17,6 +17,14 @@ function getTodayDateStringKST(): string {
   return new Date(getTodayStartKST() + KST_OFFSET_MS).toISOString().slice(0, 10)
 }
 
+const ONE_DAY_MS = 86400 * 1000
+
+/** 쿠키에 저장된 타임스탬프(ms)가 오늘 KST 구간 안이면 true */
+function isVisitTimeWithinTodayKST(visitTs: number): boolean {
+  const todayStart = getTodayStartKST()
+  return visitTs >= todayStart && visitTs < todayStart + ONE_DAY_MS
+}
+
 function getCookie(req: express.Request, name: string): string | undefined {
   const raw = req.headers.cookie
   if (!raw) return undefined
@@ -37,15 +45,22 @@ app.get('/api/stats/total', (req, res) => {
   }
 
   const todayStr = getTodayDateStringKST()
-  const alreadyCountedToday = getCookie(req, COOKIE_VISIT) === todayStr
+  const visitCookieRaw = getCookie(req, COOKIE_VISIT)?.trim()
+  const visitTs = visitCookieRaw ? Number(visitCookieRaw) : NaN
+  const alreadyCountedToday = !Number.isNaN(visitTs) && isVisitTimeWithinTodayKST(visitTs)
 
+  const now = Date.now()
   if (!alreadyCountedToday) {
     todayCount += 1
     allTimeTotal += 1
     res.setHeader(
       'Set-Cookie',
-      `${COOKIE_VISIT}=${todayStr}; Path=/; Max-Age=${86400 * 2}; SameSite=Lax`
+      `${COOKIE_VISIT}=${now}; Path=/; Max-Age=${86400 * 2}; SameSite=Lax`
     )
+  } else if (todayCount === 0) {
+    // 재시작/다른 인스턴스로 메모리가 0인데, 쿠키로 오늘 방문자는 있음 → 최소 1명으로 표시
+    todayCount = 1
+    if (allTimeTotal === 0) allTimeTotal = 1
   }
 
   res.json({
