@@ -12,64 +12,23 @@ function getTodayStartKST(): number {
   return Date.UTC(y, m, d, 0, 0, 0, 0) - KST_OFFSET_MS
 }
 
-function isTodayKST(ts: number): boolean {
-  return ts >= getTodayStartKST()
-}
-
-function getHourKST(ts: number): number {
-  const d = new Date(ts + KST_OFFSET_MS)
-  return d.getUTCHours()
-}
-
 const instanceId = Math.random().toString(36).slice(2, 8)
 let todayStartKST = getTodayStartKST()
-const hourlyCounts = new Array<number>(24).fill(0)
+let todayCount = 0
 let allTimeTotal = 0
-
-function ensureDayAndRecord(ts: number) {
-  const nowStart = getTodayStartKST()
-  if (nowStart > todayStartKST) {
-    todayStartKST = nowStart
-    hourlyCounts.fill(0)
-  }
-  if (isTodayKST(ts)) {
-    const hour = getHourKST(ts)
-    hourlyCounts[hour] += 1
-  }
-  allTimeTotal += 1
-}
-
-app.get('/api/visit', (req, res) => {
-  const ts = Date.now()
-  ensureDayAndRecord(ts)
-  res.status(204).send()
-})
-
-app.get('/api/stats/hourly', (req, res) => {
-  const nowStart = getTodayStartKST()
-  if (nowStart > todayStartKST) {
-    todayStartKST = nowStart
-    hourlyCounts.fill(0)
-  }
-  const items = hourlyCounts.map((count, hour) => ({ hour, count }))
-  res.json({
-    instanceId,
-    date: new Date(todayStartKST + KST_OFFSET_MS).toISOString().slice(0, 10),
-    timezone: 'Asia/Seoul',
-    hourly: items,
-  })
-})
 
 app.get('/api/stats/total', (req, res) => {
   const nowStart = getTodayStartKST()
   if (nowStart > todayStartKST) {
     todayStartKST = nowStart
-    hourlyCounts.fill(0)
+    todayCount = 0
   }
-  const todayTotal = hourlyCounts.reduce((a, b) => a + b, 0)
+  todayCount += 1
+  allTimeTotal += 1
+
   res.json({
     instanceId,
-    today: todayTotal,
+    today: todayCount,
     allTime: allTimeTotal,
     date: new Date(todayStartKST + KST_OFFSET_MS).toISOString().slice(0, 10),
     timezone: 'Asia/Seoul',
@@ -77,17 +36,7 @@ app.get('/api/stats/total', (req, res) => {
 })
 
 app.get('/', (req, res) => {
-  res.type('html').send(`
-    <!doctype html>
-    <html>
-      <head><meta charset="utf-8"/><title>한강물</title></head>
-      <body>
-        <a href="/api/stats/hourly">시간별 접속</a>
-        <a href="/api/stats/total">총 접속</a>
-        <script>fetch('/api/visit').catch(() => {})</script>
-      </body>
-    </html>
-  `)
+  res.redirect('/api/stats/total')
 })
 
 const port = Number(process.env.PORT) || 3000
