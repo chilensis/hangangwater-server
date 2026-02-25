@@ -6,16 +6,20 @@ const app = express()
 const SEOUL_API_KEY = process.env.SEOUL_OPENAPI_KEY || process.env.VITE_SEOUL_OPENAPI_KEY
 
 const ALLOWED_ORIGIN_SUFFIXES = ['.private-apps.tossmini.com', '.apps.tossmini.com']
+
 function isAllowedOrigin(origin: string | undefined): boolean {
-  if (!origin || !origin.startsWith('https://')) return false
-  return ALLOWED_ORIGIN_SUFFIXES.some((s) => origin.endsWith(s))
+  if (!origin) return false
+  if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) return true
+  if (origin.startsWith('https://') && ALLOWED_ORIGIN_SUFFIXES.some((s) => origin!.endsWith(s)))
+    return true
+  return false
 }
 
 app.use(
   cors({
     origin: (origin, cb) => {
       if (isAllowedOrigin(origin)) {
-        cb(null, origin!)
+        cb(null, origin ?? true)
       } else {
         cb(null, false)
       }
