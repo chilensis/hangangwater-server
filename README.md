@@ -6,12 +6,42 @@ Express 기반 접속 통계. 오전 0시(KST) 기준으로 일별 초기화됩�
 
 ```bash
 pnpm install
+cp .env.example .env   # SEOUL_OPENAPI_KEY 값 입력 후 저장
 node --experimental-strip-types src/index.ts
 ```
 
-기본 포트는 `3000`이며, `PORT` 환경 변수로 변경할 수 있습니다.
+기본 포트는 `3000`이며, `PORT` 환경 변수로 변경할 수 있습니다.  
+**Vercel**: 프로젝트 → Settings → Environment Variables 에서 `SEOUL_OPENAPI_KEY` 추가.
+
+## 환경 변수
+
+| 이름 | 설명 |
+|------|------|
+| `SEOUL_OPENAPI_KEY` | 서울 열린데이터광장 인증키 (대기질 API용). `VITE_SEOUL_OPENAPI_KEY` 도 읽음. |
 
 ## API
+
+**`GET /api/air-quality`**
+
+- 서울시 자치구별 대기환경(미세먼지/초미세먼지) 데이터를 프록시합니다.
+- **쿼리**: `districtCode` (선택) — 자치구 행정코드. 예: `111151`(중랑구). 없으면 1~5건 조회.
+- **CORS**: `/api/stats/total`과 동일하게 토스 미니앱 도메인 허용.
+
+**응답 예:**
+
+```json
+{
+  "response": {
+    "header": { "resultCode": "00" },
+    "body": {
+      "totalCount": 1,
+      "items": {
+        "item": [{ "PM": "15", "FPM": "8", "MSRSTN_NM": "중랑구" }]
+      }
+    }
+  }
+}
+```
 
 **`GET /api/stats/total`**
 

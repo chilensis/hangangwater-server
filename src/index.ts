@@ -1,7 +1,9 @@
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 
 const app = express()
+const SEOUL_API_KEY = process.env.SEOUL_OPENAPI_KEY || process.env.VITE_SEOUL_OPENAPI_KEY
 
 const ALLOWED_ORIGIN_SUFFIXES = ['.private-apps.tossmini.com', '.apps.tossmini.com']
 function isAllowedOrigin(origin: string | undefined): boolean {
@@ -110,6 +112,69 @@ app.get('/api/stats/total', (req, res) => {
     date: todayStr,
     timezone: 'Asia/Seoul',
   })
+})
+
+const SEOUL_API_BASE = 'http://openAPI.seoul.go.kr:8088'
+
+/** 서울 API row 항목을 프론트 기대 형태로 변환 (PM10→PM, PM25→FPM 등) */
+function mapRowToItem(row: Record<string, unknown>): { PM: string; FPM: string; MSRSTN_NM: string } {
+  const pm = row.PM10 ?? row.PM ?? row.pm10 ?? row.pm ?? ''
+  const fpm = row.PM25 ?? row.PM2_5 ?? row.FPM ?? row.pm25 ?? row.fpm ?? ''
+  const name = row.MSRSTN_NM ?? row.MSRSTEN_NM ?? row.msrstn_nm ?? row.msrsten_nm ?? ''
+  return {
+    PM: String(pm),
+    FPM: String(fpm),
+    MSRSTN_NM: String(name),
+  }
+}
+
+app.get('/api/air-quality', async (req, res) => {
+  if (!SEOUL_API_KEY) {
+    res.status(503).json({
+      response: {
+        header: { resultCode: '99', resultMsg: 'SEOUL_OPENAPI_KEY not configured' },
+        body: null,
+      },
+    })
+    return
+  }
+
+  const districtCode = req.query.districtCode as string | undefined
+  const start = 1
+  const end = districtCode ? 1 : 5
+  const path = districtCode
+    ? `${SEOUL_API_KEY}/json/ListAirQualityByDistrictService/${start}/${end}/${encodeURIComponent(districtCode)}`
+    : `${SEOUL_API_KEY}/json/ListAirQualityByDistrictService/${start}/${end}`
+
+  try {
+    const url = `${SEOUL_API_BASE}/${path}`
+    const apiRes = await fetch(url)
+    const data = (await apiRes.json()) as Record<string, unknown>
+
+    const service = (data.ListAirQualityByDistrictService ??
+      data.listAirQualityByDistrictService) as { row?: unknown } | undefined
+    const raw = service?.row
+    const rows = Array.isArray(raw) ? raw : raw != null ? [raw] : []
+    const item = rows.map((r: Record<string, unknown>) => mapRowToItem(r))
+
+    const totalCount = item.length
+    res.json({
+      response: {
+        header: { resultCode: '00' },
+        body: {
+          totalCount,
+          items: { item },
+        },
+      },
+    })
+  } catch (e) {
+    res.status(502).json({
+      response: {
+        header: { resultCode: '98', resultMsg: String(e instanceof Error ? e.message : e) },
+        body: null,
+      },
+    })
+  }
 })
 
 app.get('/', (req, res) => {
